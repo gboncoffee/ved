@@ -67,6 +67,9 @@ void redraw(Buffer *buf) {
     int lastx = getx();
     int lasty = gety();
 
+    assert(buf->size > 0);
+    assert(strlen(buf->lines[2]) >= 0);
+
     for (int y = 0; y <= maxy(); y++) {
         move(y, 0);
         clrtoeol();
@@ -287,6 +290,34 @@ void insert(Buffer *buf, int line, int pos, char c) {
     buf->lines[line] = newline;
 }
 
+void insert_line(Buffer *buf, int line, char *text) {
+    buf->lines = realloc(buf->lines, sizeof(char*) * (buf->size + 1));
+    // shift everything after the line to the right
+    for (int i = buf->size; i > line; i--)
+        buf->lines[i] = buf->lines[i - 1];
+    buf->lines[line] = text;
+    buf->size++;
+}
+
+void split_line(Buffer *buf, int line, int pos) {
+    char *cur = buf->lines[line];
+    int orig_len = strlen(cur);
+    char *f_half = (char*) malloc(sizeof(char) * (pos + 1));
+    char *s_half = (char*) malloc(sizeof(char) * (strlen(cur) - pos));
+
+    int i;
+    for (i = 0; i < pos; i++)
+        f_half[i] = cur[i];
+    f_half[i++] = '\0';
+    for (i = 0; i + pos < orig_len - 1; i++)
+        s_half[i] = cur[pos + i];
+    s_half[i++] = '\0';
+
+    free(cur);
+    buf->lines[line] = f_half;
+    insert_line(buf, line + 1, s_half);
+}
+
 void delete(Buffer *buf, int line, int pos) {
     char *cur = buf->lines[line];
     int orig_len = strlen(cur);
@@ -355,6 +386,17 @@ int main_loop(Buffer *buf) {
             move(lasty, lastx);
             normalize_cursor(buf);
 
+        } else if (key("^M")) {
+            int lasty = gety();
+            split_line(buf, curline_idx(), getx());
+            redraw(buf);
+            if (lasty + 1 <= maxy())
+                move(lasty + 1, 0);
+            else {
+                move(lasty, 0);
+                paginate(Down, buf);
+            }
+
         } else if (strlen(k) == 1) {
             int lastx = getx(); int lasty = gety();
             insert(buf, curline_idx(), getx(), k[0]);
@@ -395,6 +437,7 @@ int main(int argc, char *argv[]) {
     use_default_colors();
     cbreak();
     noecho();
+    nonl();
     intrflush(stdscr, FALSE);
     keypad(stdscr, TRUE);
 
@@ -403,9 +446,11 @@ int main(int argc, char *argv[]) {
     if (argc > 1) {
         buf = new_buf();
         buf = new_buf_w_file(argv[1]);
+        buf->can_discard_name = false;
         redraw(buf);
     } else {
         buf = new_buf();
+        buf->can_discard_name = false;
         redraw(buf);
         draw_welcome_msg();
     }
