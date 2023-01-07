@@ -7,6 +7,10 @@
 #include<assert.h>
 #include<curses.h>
 
+/*
+ * TODO: actually edit text
+ */
+
 #define VERSION "0.0.0-dev"
 
 #define gety() getcury(stdscr)
@@ -84,18 +88,22 @@ void redraw(Buffer *buf) {
 void move_cursor(Direction dir, Buffer *buf);
 void paginate(Direction dir, Buffer *buf) {
 
+    int cury = gety(); int curx = getx();
+
     switch(dir) {
         case Up:
             if (buf->fls > 0) {
                 buf->fls--;
                 redraw(buf);
+                move(cury, curx);
                 normalize_cursor(buf);
             }
             break;
         case Down:
-            if (curline_idx() < buf->size) {
+            if (curline_idx() < buf->size - 1) {
                 buf->fls++;
                 redraw(buf);
+                move(cury, curx);
                 normalize_cursor(buf);
             }
             break;
@@ -285,6 +293,14 @@ int main_loop(Buffer *buf) {
 
         } else if (key("KEY_DOWN") || key("^N")) {
             move_cursor(Down, buf);
+
+        } else if (key("KEY_PPAGE")) {
+            paginate(Up, buf);
+            normalize_cursor(buf);
+
+        } else if (key("KEY_NPAGE")) {
+            paginate(Down, buf);
+            normalize_cursor(buf);
 
         }
     }
