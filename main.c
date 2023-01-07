@@ -4,6 +4,7 @@
 #include<string.h>
 #include<locale.h>
 #include<stdbool.h>
+#include<assert.h>
 #include<curses.h>
 
 #define VERSION "0.0.0-dev"
@@ -13,6 +14,10 @@
 #define maxy() (LINES - 2)
 #define maxx() (COLS - 1)
 #define key(str) (strcmp(k, str) == 0)
+#define curline() (buf->lines[buf->fls + gety()])
+#define curline_idx() (buf->fls + gety())
+#define on_impossible() (getx() > (int) strlen(curline()))
+#define normalize_cursor(buf) if (on_impossible()) move_cursor(FarRight, buf)
 
 /*
  * Copyright (c) 2023 Gabriel G. de Brito
@@ -44,6 +49,110 @@ typedef struct Buffer {
     bool can_discard_name;
     FILE *fp;
 } Buffer;
+
+typedef enum Direction {
+    Left,
+    Right,
+    Up,
+    Down,
+    FarRight,
+    FarLeft,
+} Direction;
+
+void redraw(Buffer *buf) {
+    int lastx = getx();
+    int lasty = gety();
+
+    for (int y = 0; y <= maxy(); y++) {
+        move(y, 0);
+        clrtoeol();
+        if (y + buf->fls < buf->size)
+            addstr(buf->lines[buf->fls + y]);
+        else
+            addstr("~");
+    }
+    move(LINES - 1, 0);
+
+    // revert colors for statusline
+    attron(A_REVERSE);
+    mvaddstr(LINES - 1, 0, buf->name);
+    attroff(A_REVERSE);
+
+    move(lastx, lasty);
+}
+
+void move_cursor(Direction dir, Buffer *buf);
+void paginate(Direction dir, Buffer *buf) {
+
+    switch(dir) {
+        case Up:
+            if (buf->fls > 0) {
+                buf->fls--;
+                redraw(buf);
+                normalize_cursor(buf);
+            }
+            break;
+        case Down:
+            if (curline_idx() < buf->size) {
+                buf->fls++;
+                redraw(buf);
+                normalize_cursor(buf);
+            }
+            break;
+        default:
+            assert(0 && "Unreachable");
+    }
+}
+
+void move_cursor(Direction dir, Buffer *buf) {
+
+    switch(dir) {
+        case Right:
+            if (getx() < (int) strlen(curline()))
+                move(gety(), getx() + 1);
+            else {
+                move_cursor(Down, buf);
+                move_cursor(FarLeft, buf);
+            }
+            break;
+        case Left:
+            if (getx() > 0)
+                move(gety(), getx() - 1);
+            else if (curline_idx() > 0) {
+                move_cursor(Up, buf);
+                move_cursor(FarRight, buf);
+            }
+            break;
+        case Up:
+            if (gety() > 0) {
+                move(gety() - 1, getx());
+                normalize_cursor(buf);
+            } else {
+                paginate(Up, buf);
+                move(0, getx());
+                normalize_cursor(buf);
+            }
+            break;
+        case Down:
+            if (curline_idx() < buf->size - 1) {
+                if (gety() < maxy()) {
+                    move(gety() + 1, getx());
+                    normalize_cursor(buf);
+                } else {
+                    int lastx = getx();
+                    paginate(Down, buf);
+                    move(maxy(), lastx);
+                    normalize_cursor(buf);
+                }
+            }
+            break;
+        case FarRight:
+            move(gety(), strlen(curline()));
+            break;
+        case FarLeft:
+            move(gety(), 0);
+    }
+}
 
 Buffer *new_buf() {
     char **lines = (char**) malloc(sizeof(char*));
@@ -153,27 +262,6 @@ Buffer *new_buf_w_file(char *path) {
     return new;
 }
 
-void redraw(Buffer *buf) {
-    int lastx = getx();
-    int lasty = gety();
-
-    for (int y = 0; y <= maxy(); y++) {
-        move(y, 0);
-        if (y + buf->fls < buf->size)
-            addstr(buf->lines[buf->fls + y]);
-        else
-            addstr("~");
-    }
-    move(LINES - 1, 0);
-
-    // revert colors for statusline
-    attron(A_REVERSE);
-    mvaddstr(LINES - 1, 0, buf->name);
-    attroff(A_REVERSE);
-
-    move(lastx, lasty);
-}
-
 int main_loop(Buffer *buf) {
 
     const char *k;
@@ -185,6 +273,19 @@ int main_loop(Buffer *buf) {
 
         } else if (key("KEY_RESIZE")) {
             redraw(buf);
+
+        } else if (key("KEY_LEFT") || key("^B")) {
+            move_cursor(Left, buf);
+
+        } else if (key("KEY_RIGHT") || key("^F")) {
+            move_cursor(Right, buf);
+
+        } else if (key("KEY_UP") || key("^P")) {
+            move_cursor(Up, buf);
+
+        } else if (key("KEY_DOWN") || key("^N")) {
+            move_cursor(Down, buf);
+
         }
     }
 
