@@ -287,6 +287,22 @@ void insert(Buffer *buf, int line, int pos, char c) {
     buf->lines[line] = newline;
 }
 
+void delete(Buffer *buf, int line, int pos) {
+    char *cur = buf->lines[line];
+    int orig_len = strlen(cur);
+
+    char *newline = (char*) malloc(sizeof(char) * (orig_len));
+
+    if (pos < 0 || pos >= orig_len)
+        assert(0 && "TODO! Remove/merge lines");
+
+    memcpy(newline, cur, pos);
+    memcpy(newline + pos, cur + pos + 1, orig_len - pos);
+
+    free(buf->lines[line]);
+    buf->lines[line] = newline;
+}
+
 int main_loop(Buffer *buf) {
 
     const char *k;
@@ -323,6 +339,20 @@ int main_loop(Buffer *buf) {
 
         } else if (key("KEY_NPAGE")) {
             paginate(Down, buf);
+            normalize_cursor(buf);
+
+        } else if (key("KEY_BACKSPACE")) {
+            int lastx = getx(); int lasty = gety();
+            delete(buf, curline_idx(), getx() - 1);
+            redraw(buf);
+            move(lasty, lastx - 1);
+            normalize_cursor(buf);
+
+        } else if (key("KEY_DC") || key("^D")) {
+            int lastx = getx(); int lasty = gety();
+            delete(buf, curline_idx(), getx());
+            redraw(buf);
+            move(lasty, lastx);
             normalize_cursor(buf);
 
         } else if (strlen(k) == 1) {
