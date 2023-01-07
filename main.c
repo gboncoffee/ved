@@ -67,9 +67,6 @@ void redraw(Buffer *buf) {
     int lastx = getx();
     int lasty = gety();
 
-    assert(buf->size > 0);
-    assert(strlen(buf->lines[2]) >= 0);
-
     for (int y = 0; y <= maxy(); y++) {
         move(y, 0);
         clrtoeol();
@@ -78,6 +75,7 @@ void redraw(Buffer *buf) {
         else
             addstr("~");
     }
+
     move(LINES - 1, 0);
 
     // revert colors for statusline
@@ -309,7 +307,7 @@ void split_line(Buffer *buf, int line, int pos) {
     for (i = 0; i < pos; i++)
         f_half[i] = cur[i];
     f_half[i++] = '\0';
-    for (i = 0; i + pos < orig_len - 1; i++)
+    for (i = 0; i + pos < orig_len; i++)
         s_half[i] = cur[pos + i];
     s_half[i++] = '\0';
 
