@@ -118,7 +118,7 @@ void move_cursor(Direction dir, Buffer *buf) {
         case Right:
             if (getx() < (int) strlen(curline()))
                 move(gety(), getx() + 1);
-            else {
+            else if (curline_idx() < buf->size - 1) {
                 move_cursor(Down, buf);
                 move_cursor(FarLeft, buf);
             }
@@ -233,7 +233,7 @@ Buffer *new_buf_w_file(char *path) {
     new->size = n_lines;
 
     int cur_line = 0;
-    int l_size = 1;
+    int l_size = 0;
     for (;;) {
 
         char c = getc(fp);
@@ -243,18 +243,17 @@ Buffer *new_buf_w_file(char *path) {
                 break;
 
             if (l_size > 0) {
-                fseek(fp, -l_size, SEEK_CUR);
+                fseek(fp, -(l_size + 1), SEEK_CUR);
                 lines[cur_line] = (char*) malloc(sizeof(char) * (l_size + 1));
-                fgets(lines[cur_line], l_size, fp);
+                fgets(lines[cur_line], l_size + 1, fp);
+                // advance over the \n
+                getc(fp);
             } else {
                 lines[cur_line] = (char*) malloc(sizeof(char));
                 lines[cur_line][0] = '\0';
             }
 
-            // advance over the \n
-            getc(fp);
-
-            l_size = 1;
+            l_size = 0;
             cur_line++;
             if (c == EOF)
                 break;
@@ -268,6 +267,24 @@ Buffer *new_buf_w_file(char *path) {
     new->fls = 0;
 
     return new;
+}
+
+void insert(Buffer *buf, int line, int pos, char c) {
+
+    char *cur = buf->lines[line];
+    int orig_len = strlen(cur);
+
+    char *newline = (char*) malloc(sizeof(char) * (orig_len + 2));
+    if (pos != 0)
+        memcpy(newline, cur, pos);
+    newline[pos] = c;
+    if (pos != orig_len)
+        memcpy(newline + pos + 1, cur + pos, orig_len - pos);
+
+    newline[orig_len + 1] = '\0';
+
+    free(buf->lines[line]);
+    buf->lines[line] = newline;
 }
 
 int main_loop(Buffer *buf) {
@@ -294,6 +311,12 @@ int main_loop(Buffer *buf) {
         } else if (key("KEY_DOWN") || key("^N")) {
             move_cursor(Down, buf);
 
+        } else if (key("KEY_END") || key("^E")) {
+            move_cursor(FarRight, buf);
+
+        } else if (key("KEY_HOME") || key("^A")) {
+            move_cursor(FarLeft, buf);
+
         } else if (key("KEY_PPAGE")) {
             paginate(Up, buf);
             normalize_cursor(buf);
@@ -302,6 +325,11 @@ int main_loop(Buffer *buf) {
             paginate(Down, buf);
             normalize_cursor(buf);
 
+        } else if (strlen(k) == 1) {
+            int lastx = getx(); int lasty = gety();
+            insert(buf, curline_idx(), getx(), k[0]);
+            redraw(buf);
+            move(lasty, lastx + 1);
         }
     }
 
