@@ -316,14 +316,42 @@ void split_line(Buffer *buf, int line, int pos) {
     insert_line(buf, line + 1, s_half);
 }
 
+void remove_line(Buffer *buf, int line) {
+    assert(line >= 0 && line < buf->size);
+    free(buf->lines[line]);
+
+    for (int i = line; i < buf->size - 1; i++) {
+        buf->lines[i] = buf->lines[i + 1];
+    }
+    buf->lines = realloc(buf->lines, sizeof(char*) * (buf->size - 1));
+    buf->size--;
+}
+
+void merge_down(Buffer *buf, int line) {
+    if (line <= 0 || line >= buf->size)
+        return;
+
+    char *merg = buf->lines[line];
+
+    buf->lines[line - 1] = realloc(buf->lines[line - 1], sizeof(char) * (strlen(merg) + strlen(buf->lines[line - 1]) + 1));
+    strcat(buf->lines[line - 1], merg);
+
+    remove_line(buf, line);
+}
+
 void delete(Buffer *buf, int line, int pos) {
     char *cur = buf->lines[line];
     int orig_len = strlen(cur);
 
     char *newline = (char*) malloc(sizeof(char) * (orig_len));
 
-    if (pos < 0 || pos >= orig_len)
-        assert(0 && "TODO! Remove/merge lines");
+    if (pos < 0) {
+        merge_down(buf, line);
+        return;
+    } else if (pos >= orig_len) {
+        merge_down(buf, line + 1);
+        return;
+    }
 
     memcpy(newline, cur, pos);
     memcpy(newline + pos, cur + pos + 1, orig_len - pos);
@@ -372,7 +400,15 @@ int main_loop(Buffer *buf) {
 
         } else if (key("KEY_BACKSPACE")) {
             int lastx = getx(); int lasty = gety();
-            delete(buf, curline_idx(), getx() - 1);
+
+            if (lastx == 0) {
+                move_cursor(Up, buf);
+                move_cursor(FarRight, buf);
+                lastx = getx() + 1; lasty = gety();
+                delete(buf, curline_idx() + 1, -1);
+            } else
+                delete(buf, curline_idx(), getx() -1);
+
             redraw(buf);
             move(lasty, lastx - 1);
             normalize_cursor(buf);
@@ -380,6 +416,7 @@ int main_loop(Buffer *buf) {
         } else if (key("KEY_DC") || key("^D")) {
             int lastx = getx(); int lasty = gety();
             delete(buf, curline_idx(), getx());
+
             redraw(buf);
             move(lasty, lastx);
             normalize_cursor(buf);
