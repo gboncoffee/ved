@@ -6,7 +6,7 @@ highlighting, multiple buffers, etc.
 ## Quickstart
 
 `$ make`  
-`./ved akatsuki.txt`
+`$ ./ved akatsuki.txt`
 
 ## Keybinds
 
