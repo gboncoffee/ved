@@ -51,7 +51,6 @@ typedef struct Buffer {
     int fls;
     char *name;
     bool can_discard_name;
-    FILE *fp;
 } Buffer;
 
 typedef enum Direction {
@@ -173,7 +172,6 @@ Buffer *new_buf() {
     new->size = 1;
     new->name = "[No Name]";
     new->can_discard_name = false;
-    new->fp = NULL;
     new->fls = 0;
 
     return new;
@@ -185,23 +183,16 @@ void discard_buf(Buffer *buf) {
     }
     if (buf->can_discard_name)
         free(buf->name);
-    if (buf->fp != NULL)
-        fclose(buf->fp);
     free(buf);
 }
 
-Buffer *new_buf_w_file(char *path) {
+Buffer *new_buf_from_file(char *path) {
 
     Buffer *new;
 
-    FILE *fp = fopen(path, "r+");
+    FILE *fp = fopen(path, "r");
     if (fp == NULL) {
         new = new_buf();
-        new->fp = fopen(path, "w+");
-        if (new->fp == NULL) {
-            discard_buf(new);
-            return NULL;
-        }
         errno = 0;
         new->name = path;
         return new;
@@ -209,7 +200,6 @@ Buffer *new_buf_w_file(char *path) {
 
     new = (Buffer*) malloc(sizeof(Buffer));
     new->name = path;
-    new->fp = fp;
 
     // get number of lines in stream
     int n_lines = 1;
@@ -268,6 +258,59 @@ Buffer *new_buf_w_file(char *path) {
     new->fls = 0;
 
     return new;
+}
+
+int save_file(Buffer *buf) {
+    char *name = buf->name;
+    bool warn = false;
+
+    if (strcmp(name, "[No Name]") == 0) {
+ask_file:
+        move(LINES - 1, 0);
+        clrtoeol();
+        // revert colors for prompt
+        attron(A_REVERSE);
+        if (warn) {
+#define WARN_FNAME_MSG "Cannot write to file! Try other name:"
+            addstr(WARN_FNAME_MSG);
+            move(LINES - 1, sizeof(WARN_FNAME_MSG));
+        } else {
+#define GET_FNAME_MSG "File name [max 128 chars]:"
+            addstr(GET_FNAME_MSG);
+            move(LINES - 1, sizeof(GET_FNAME_MSG));
+        }
+        attroff(A_REVERSE);
+
+        name = (char*) malloc(sizeof(char) * 128);
+        echo();
+        if (getstr(name) == ERR) {
+            errno = ENAMETOOLONG;
+            goto ask_file;
+        }
+
+        buf->can_discard_name = true;
+    }
+
+    FILE *fp = fopen(name, "w");
+    if (fp == NULL) {
+        assert(0 && "reach");
+        if (buf->can_discard_name) {
+            free(buf->name);
+            buf->can_discard_name = false;
+            buf->name = NULL;
+        }
+        warn = true;
+        goto ask_file;
+    }
+
+    for (int line = 0; line < buf->size; line++) {
+        fputs(buf->lines[line], fp);
+        fputc('\n', fp);
+    }
+
+    fclose(fp);
+
+    return errno;
 }
 
 void insert(Buffer *buf, int line, int pos, char c) {
@@ -480,7 +523,7 @@ int main(int argc, char *argv[]) {
 
     if (argc > 1) {
         buf = new_buf();
-        buf = new_buf_w_file(argv[1]);
+        buf = new_buf_from_file(argv[1]);
         buf->can_discard_name = false;
         redraw(buf);
     } else {
@@ -491,6 +534,8 @@ int main(int argc, char *argv[]) {
     }
 
     main_loop(buf);
+
+    save_file(buf);
 
     endwin();
 
