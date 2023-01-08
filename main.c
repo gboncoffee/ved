@@ -7,11 +7,7 @@
 #include<assert.h>
 #include<curses.h>
 
-/*
- * TODO: actually edit text
- */
-
-#define VERSION "0.0.0-dev"
+#define VERSION "1.0.0"
 
 #define gety() getcury(stdscr)
 #define getx() getcurx(stdscr)
