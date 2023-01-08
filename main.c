@@ -272,10 +272,9 @@ int save_file(Buffer *buf) {
     if (c == 'N' || c == 'n')
         return errno;
 
-    char *name = buf->name;
     bool warn = false;
 
-    if (strcmp(name, "[No Name]") == 0) {
+    if (strcmp(buf->name, "[No Name]") == 0) {
 ask_file:
         move(LINES - 1, 0);
         clrtoeol();
@@ -292,23 +291,24 @@ ask_file:
         }
         attroff(A_REVERSE);
 
-        name = (char*) malloc(sizeof(char) * 128);
+        char *name = (char*) malloc(sizeof(char) * 128);
         echo();
         if (getstr(name) == ERR) {
             errno = ENAMETOOLONG;
+            free(name);
             goto ask_file;
         }
 
+        buf->name = name;
         buf->can_discard_name = true;
     }
 
-    FILE *fp = fopen(name, "w");
+    FILE *fp = fopen(buf->name, "w");
     if (fp == NULL) {
-        assert(0 && "reach");
         if (buf->can_discard_name) {
             free(buf->name);
             buf->can_discard_name = false;
-            buf->name = NULL;
+            buf->name = "[No Name]";
         }
         warn = true;
         goto ask_file;
@@ -321,7 +321,7 @@ ask_file:
 
     fclose(fp);
 
-    return errno;
+    return (errno = 0);
 }
 
 void insert(Buffer *buf, int line, int pos, char c) {
