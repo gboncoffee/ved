@@ -261,6 +261,17 @@ Buffer *new_buf_from_file(char *path) {
 }
 
 int save_file(Buffer *buf) {
+
+    // ask if save
+    move(LINES - 1, 0);
+    clrtoeol();
+    attron(A_REVERSE);
+    addstr("Save? [Y/n]");
+    attroff(A_REVERSE);
+    char c = getch();
+    if (c == 'N' || c == 'n')
+        return errno;
+
     char *name = buf->name;
     bool warn = false;
 
