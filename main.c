@@ -158,7 +158,7 @@ void move_cursor(Direction dir, Buffer *buf) {
     }
 }
 
-Buffer *new_buf() {
+Buffer *new_buf(void) {
     char **lines = (char**) malloc(sizeof(char*));
     lines[0] = (char*) malloc(sizeof(char));
     lines[0][0] = '\0';
@@ -499,7 +499,7 @@ int main_loop(Buffer *buf) {
 #define LINE4 "Copyright (c) 2023 Gabriel G. de Brito"
 #define ADD_MSG(msg, line) move(line, ((maxx() + 1) - sizeof(msg)) / 2); addstr(msg)
 
-void draw_welcome_msg() {
+void draw_welcome_msg(void) {
 
     // we need to literally visually see which is the biggest line in the case
     // of changing the message
