@@ -1,7 +1,12 @@
 # Visual EDitor
 
-Simple visual text editor written in pure C. No support (until now) for search,
-highlighting, multiple buffers, etc.
+Simple visual text editor written in pure C.
+
+There's nothing here, just a playground. It's not usefull because of:  
+- Inserting/reading unicode causes segfault;  
+- Writing/reading a line bigger than the window width also causes segfault;  
+- Tab character is literally unsupported;  
+- The file name should not be bigger than 128 bytes.
 
 ## Quickstart
 
